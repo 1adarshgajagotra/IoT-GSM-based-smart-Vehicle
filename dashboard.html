@@ -203,11 +203,11 @@ const REAL_DEVICE_ID = "vehicle-01"; // matches the ESP32 firmware's device id
 
 // ---------------- AUTH GATE ----------------
 auth.onAuthStateChanged(user => {
-  if(!user){ window.location.href = 'login.html'; return; }
+  if(!user){ window.location.href = 'index.html'; return; }
   currentUser = user;
   db.ref('users/' + user.uid).get().then(snap => {
     const rec = snap.val();
-    if(!rec || rec.disabled){ auth.signOut(); window.location.href = 'login.html'; return; }
+    if(!rec || rec.disabled){ auth.signOut(); window.location.href = 'index.html'; return; }
     myRole = rec.role;
     document.getElementById('whoEmail').textContent = rec.email || user.email;
     const badge = document.getElementById('roleBadge');
