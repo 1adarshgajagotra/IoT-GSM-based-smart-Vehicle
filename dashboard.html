@@ -42,6 +42,7 @@
   .view.active{ display:block; }
 
   .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+  .grid3{ display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:18px; }
   .panel{ background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:20px; }
   .panel h3{ margin:0 0 14px 0; font-size:13.5px; font-family:'IBM Plex Mono',monospace; color:var(--dim); font-weight:500; }
   .chart-wrap{ height:220px; display:flex; align-items:center; justify-content:center; }
@@ -131,7 +132,7 @@
 
 <!-- DASHBOARD -->
 <div class="view active" id="view-dashboard">
-  <div class="grid2">
+  <div class="grid3">
     <div class="panel">
       <h3>DEVICE STATUS</h3>
       <div class="chart-wrap"><canvas id="deviceChart"></canvas></div>
@@ -139,6 +140,18 @@
     <div class="panel">
       <h3>TASK STATUS</h3>
       <div class="chart-wrap"><canvas id="taskChart"></canvas></div>
+    </div>
+    <div class="panel">
+      <h3>LINK TYPE</h3>
+      <div class="chart-wrap"><canvas id="linkChart"></canvas></div>
+    </div>
+    <div class="panel">
+      <h3>BATTERY LEVELS</h3>
+      <div class="chart-wrap"><canvas id="batteryChart"></canvas></div>
+    </div>
+    <div class="panel">
+      <h3>ACTIVE CONTROLLER</h3>
+      <div class="chart-wrap"><canvas id="controlChart"></canvas></div>
     </div>
   </div>
 </div>
@@ -181,6 +194,7 @@
 
     <h3 style="margin-top:26px;">DEMO FLEET</h3>
     <button class="btn outline" id="seedBtn">Seed / refresh simulated demo devices</button>
+    <div id="seedMsg" style="font-family:'IBM Plex Mono',monospace;font-size:12px;margin-top:10px;"></div>
   </div>
 </div>
 
@@ -230,17 +244,30 @@ document.querySelectorAll('.tab').forEach(t => {
 });
 
 // ---------------- CHARTS ----------------
-let deviceChart, taskChart;
+let deviceChart, taskChart, linkChart, batteryChart, controlChart;
 function initCharts(){
-  const ctx1 = document.getElementById('deviceChart');
-  deviceChart = new Chart(ctx1, { type:'doughnut',
-    data:{ labels:['Online','Offline'], datasets:[{ data:[0,0], backgroundColor:['#33d17a','#e4574c'], borderWidth:0 }] },
-    options:{ plugins:{ legend:{ labels:{ color:'#e7edf0' } } } } });
+  const legendWhite = { plugins:{ legend:{ labels:{ color:'#e7edf0' } } } };
 
-  const ctx2 = document.getElementById('taskChart');
-  taskChart = new Chart(ctx2, { type:'doughnut',
+  deviceChart = new Chart(document.getElementById('deviceChart'), { type:'doughnut',
+    data:{ labels:['Online','Offline'], datasets:[{ data:[0,0], backgroundColor:['#33d17a','#e4574c'], borderWidth:0 }] },
+    options: legendWhite });
+
+  taskChart = new Chart(document.getElementById('taskChart'), { type:'doughnut',
     data:{ labels:['Towards pickup','Towards drop','Idle'], datasets:[{ data:[0,0,0], backgroundColor:['#33d17a','#4d8fe0','#8a6a4a'], borderWidth:0 }] },
-    options:{ plugins:{ legend:{ labels:{ color:'#e7edf0' } } } } });
+    options: legendWhite });
+
+  linkChart = new Chart(document.getElementById('linkChart'), { type:'doughnut',
+    data:{ labels:['WiFi','SIM (4G)'], datasets:[{ data:[0,0], backgroundColor:['#4d8fe0','#e8a33d'], borderWidth:0 }] },
+    options: legendWhite });
+
+  batteryChart = new Chart(document.getElementById('batteryChart'), { type:'bar',
+    data:{ labels:['0-20%','20-50%','50-80%','80-100%'], datasets:[{ data:[0,0,0,0], backgroundColor:'#33d17a', borderWidth:0 }] },
+    options:{ plugins:{ legend:{ display:false } },
+      scales:{ x:{ ticks:{ color:'#7c8992' }, grid:{ color:'#2a333a' } }, y:{ ticks:{ color:'#7c8992' }, grid:{ color:'#2a333a' }, beginAtZero:true } } } });
+
+  controlChart = new Chart(document.getElementById('controlChart'), { type:'doughnut',
+    data:{ labels:['Operator-controlled','Admin override'], datasets:[{ data:[0,0], backgroundColor:['#4d8fe0','#a682e8'], borderWidth:0 }] },
+    options: legendWhite });
 }
 
 // ---------------- DEVICES ----------------
@@ -271,13 +298,35 @@ function listenDevices(){
 function renderCharts(devices){
   if(!deviceChart || !taskChart) return; // charts never initialized (e.g. CDN blocked) — skip safely
   let online = 0, offline = 0, pick = 0, drop = 0, idle = 0;
+  let wifi = 0, lte = 0;
+  const batteryBuckets = [0,0,0,0]; // 0-20, 20-50, 50-80, 80-100
+  let operatorControlled = 0, adminControlled = 0;
+
   Object.values(devices).forEach(d => {
     if(d.status && d.status.online) online++; else offline++;
     const task = (d.telemetry && d.telemetry.task) || 'idle';
     if(task === 'toPickup') pick++; else if(task === 'toDrop') drop++; else idle++;
+
+    const link = d.status && d.status.link;
+    if(link === 'wifi') wifi++; else if(link === 'lte') lte++;
+
+    const battery = d.telemetry && d.telemetry.battery;
+    if(typeof battery === 'number'){
+      if(battery < 20) batteryBuckets[0]++;
+      else if(battery < 50) batteryBuckets[1]++;
+      else if(battery < 80) batteryBuckets[2]++;
+      else batteryBuckets[3]++;
+    }
+
+    const activeSource = (d.control && d.control.activeSource) || 'operator';
+    if(activeSource === 'admin') adminControlled++; else operatorControlled++;
   });
+
   deviceChart.data.datasets[0].data = [online, offline]; deviceChart.update();
   taskChart.data.datasets[0].data = [pick, drop, idle]; taskChart.update();
+  if(linkChart){ linkChart.data.datasets[0].data = [wifi, lte]; linkChart.update(); }
+  if(batteryChart){ batteryChart.data.datasets[0].data = batteryBuckets; batteryChart.update(); }
+  if(controlChart){ controlChart.data.datasets[0].data = [operatorControlled, adminControlled]; controlChart.update(); }
 }
 
 function renderDeviceList(devices){
@@ -507,7 +556,21 @@ function seedDemoFleet(){
       task: tasks[Math.floor(Math.random()*tasks.length)]
     };
   }
-  db.ref().update(updates);
+  const btn = document.getElementById('seedBtn');
+  const msgEl = document.getElementById('seedMsg');
+  btn.disabled = true;
+  msgEl.style.color = 'var(--dim)';
+  msgEl.textContent = 'Seeding…';
+  db.ref().update(updates)
+    .then(() => {
+      msgEl.style.color = 'var(--green)';
+      msgEl.textContent = '9 demo devices seeded/updated successfully.';
+    })
+    .catch(err => {
+      msgEl.style.color = 'var(--red)';
+      msgEl.textContent = 'Failed: ' + err.message;
+    })
+    .finally(() => { btn.disabled = false; });
 }
 </script>
 </body>
