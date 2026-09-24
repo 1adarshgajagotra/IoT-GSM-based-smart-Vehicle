@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vehicle Link Status</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0f1417;
+    --panel:#171e23;
+    --panel-line:#2a333a;
+    --text:#e7edf0;
+    --text-dim:#7c8992;
+    --mono-dim:#5b6b74;
+    --green:#33d17a;
+    --amber:#e8a33d;
+    --red:#e4574c;
+    --blue:#4d8fe0;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(ellipse 900px 500px at 15% -10%, #17222680, transparent),
+      var(--bg);
+    color:var(--text);
+    font-family:'IBM Plex Sans',sans-serif;
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:32px 20px;
+  }
+  .console{
+    width:100%;
+    max-width:640px;
+  }
+  .console-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    margin-bottom:22px;
+    padding-bottom:14px;
+    border-bottom:1px solid var(--panel-line);
+  }
+  .console-head h1{
+    font-size:17px;
+    font-weight:600;
+    margin:0;
+    letter-spacing:0.2px;
+  }
+  .console-head span{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    color:var(--mono-dim);
+  }
+  .hero{
+    background:var(--panel);
+    border:1px solid var(--panel-line);
+    border-radius:10px;
+    padding:34px 28px;
+    display:flex;
+    align-items:center;
+    gap:22px;
+    margin-bottom:16px;
+    position:relative;
+    overflow:hidden;
+  }
+  .pulse-dot{
+    width:16px;height:16px;border-radius:50%;
+    flex-shrink:0;
+    background:var(--mono-dim);
+    box-shadow:0 0 0 0 currentColor;
+    transition:background 0.4s ease;
+  }
+  .pulse-dot.online{ background:var(--green); color:var(--green); animation:pulse 1.8s infinite; }
+  .pulse-dot.offline{ background:var(--red); color:var(--red); }
+  .pulse-dot.searching{ background:var(--amber); color:var(--amber); animation:pulse 1s infinite; }
+  @keyframes pulse{
+    0%{box-shadow:0 0 0 0 currentColor44;}
+    70%{box-shadow:0 0 0 12px transparent;}
+    100%{box-shadow:0 0 0 0 transparent;}
+  }
+  .hero-text .status-label{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:13px;
+    color:var(--text-dim);
+    margin:0 0 4px 0;
+  }
+  .hero-text .status-value{
+    font-size:26px;
+    font-weight:600;
+    margin:0;
+  }
+  .status-value.online{color:var(--green);}
+  .status-value.offline{color:var(--red);}
+  .status-value.searching{color:var(--amber);}
+
+  .grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:14px;
+    margin-bottom:16px;
+  }
+  .card{
+    background:var(--panel);
+    border:1px solid var(--panel-line);
+    border-radius:10px;
+    padding:18px 20px;
+  }
+  .card .k{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    color:var(--mono-dim);
+    margin:0 0 8px 0;
+  }
+  .card .v{
+    font-size:18px;
+    font-weight:600;
+    margin:0;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .link-icon{width:18px;height:18px;flex-shrink:0;}
+  .card .v.wifi{color:var(--blue);}
+  .card .v.lte{color:var(--amber);}
+  .card .v.none{color:var(--mono-dim);}
+
+  .log{
+    background:var(--panel);
+    border:1px solid var(--panel-line);
+    border-radius:10px;
+    padding:14px 20px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12.5px;
+    color:var(--text-dim);
+    line-height:1.7;
+    max-height:120px;
+    overflow-y:auto;
+  }
+  .log div span{color:var(--mono-dim);margin-right:8px;}
+
+  .demo-strip{
+    margin-top:22px;
+    padding-top:18px;
+    border-top:1px solid var(--panel-line);
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    align-items:center;
+  }
+  .demo-strip .label{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    color:var(--mono-dim);
+    width:100%;
+    margin-bottom:4px;
+  }
+  .demo-strip button{
+    background:transparent;
+    border:1px solid var(--panel-line);
+    color:var(--text-dim);
+    font-family:'IBM Plex Sans',sans-serif;
+    font-size:12.5px;
+    padding:7px 13px;
+    border-radius:6px;
+    cursor:pointer;
+    transition:border-color 0.15s, color 0.15s;
+  }
+  .demo-strip button:hover{ border-color:var(--blue); color:var(--text); }
+  .demo-strip button:focus-visible{ outline:2px solid var(--blue); outline-offset:2px; }
+
+  @media (max-width:480px){
+    .grid{grid-template-columns:1fr;}
+    .hero{flex-direction:column;text-align:center;}
+  }
+</style>
+</head>
+<body>
+
+<div class="console">
+  <div class="console-head">
+    <h1>Vehicle Link Status</h1>
+    <span id="clock">--:--:--</span>
+  </div>
+
+  <div class="hero">
+    <div class="pulse-dot searching" id="dot"></div>
+    <div class="hero-text">
+      <p class="status-label">SYSTEM</p>
+      <p class="status-value searching" id="statusValue">Checking…</p>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <p class="k">ACTIVE LINK</p>
+      <p class="v none" id="linkValue">—</p>
+    </div>
+    <div class="card">
+      <p class="k">LAST HEARTBEAT</p>
+      <p class="v" id="heartbeatValue" style="color:var(--text-dim); font-size:14px; font-weight:400;">—</p>
+    </div>
+  </div>
+
+  <div class="log" id="log">
+    <div><span>[boot]</span>waiting for first status update…</div>
+  </div>
+
+  <!-- Demo controls: only for showing the page working without live hardware.
+       Remove this whole .demo-strip block once you're driving the page from
+       real Firebase data during the actual demo, if you'd rather not show
+       the controls to your professors. -->
+  <div class="demo-strip">
+    <span class="label">DEMO CONTROLS (simulate device — remove for live use)</span>
+    <button onclick="simulate('online','wifi')">Online · WiFi</button>
+    <button onclick="simulate('online','lte')">Online · SIM (4G)</button>
+    <button onclick="simulate('searching')">Searching</button>
+    <button onclick="simulate('offline')">Offline</button>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   HOW THIS PAGE GETS ITS DATA
+   ------------------------------------------------------------
+   1. DEMO MODE (default, works with zero setup): the buttons
+      below call simulate() directly — good for showing the UI
+      to professors when the physical device isn't reachable.
+
+   2. LIVE MODE (real device): fill in FIREBASE_CONFIG below with
+      your free Firebase project's config, uncomment
+      startLiveMode(), and have your ESP32 firmware write to the
+      same Realtime Database path shown in ESP32 FIRMWARE SIDE.
+      This page then updates itself automatically — no redeploy
+      needed when the device's status changes.
+   ============================================================ */
+
+const FIREBASE_CONFIG = {
+  // apiKey: "YOUR_API_KEY",
+  // databaseURL: "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
+  // projectId: "YOUR_PROJECT"
+};
+
+const dot = document.getElementById('dot');
+const statusValue = document.getElementById('statusValue');
+const linkValue = document.getElementById('linkValue');
+const heartbeatValue = document.getElementById('heartbeatValue');
+const logEl = document.getElementById('log');
+
+function pad(n){ return n.toString().padStart(2,'0'); }
+
+function tickClock(){
+  const d = new Date();
+  document.getElementById('clock').textContent =
+    `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+setInterval(tickClock, 1000); tickClock();
+
+function logLine(text){
+  const time = new Date().toLocaleTimeString();
+  const row = document.createElement('div');
+  row.innerHTML = `<span>[${time}]</span>${text}`;
+  logEl.prepend(row);
+  while(logEl.children.length > 6) logEl.removeChild(logEl.lastChild);
+}
+
+function render(state){
+  // state = { online: bool|null, link: 'wifi'|'lte'|null, ts: Date|null }
+  dot.className = 'pulse-dot';
+  statusValue.className = 'status-value';
+
+  if(state.online === true){
+    dot.classList.add('online');
+    statusValue.classList.add('online');
+    statusValue.textContent = 'Online';
+  } else if(state.online === false){
+    dot.classList.add('offline');
+    statusValue.classList.add('offline');
+    statusValue.textContent = 'Offline';
+  } else {
+    dot.classList.add('searching');
+    statusValue.classList.add('searching');
+    statusValue.textContent = 'Searching…';
+  }
+
+  linkValue.className = 'v';
+  if(state.link === 'wifi'){
+    linkValue.classList.add('wifi');
+    linkValue.textContent = 'WiFi';
+  } else if(state.link === 'lte'){
+    linkValue.classList.add('lte');
+    linkValue.textContent = 'SIM · 4G LTE';
+  } else {
+    linkValue.classList.add('none');
+    linkValue.textContent = '—';
+  }
+
+  heartbeatValue.textContent = state.ts ? state.ts.toLocaleTimeString() : '—';
+}
+
+function simulate(mode, link){
+  if(mode === 'online'){
+    render({ online:true, link, ts:new Date() });
+    logLine(`status: online via ${link === 'wifi' ? 'WiFi' : 'SIM (4G)'}`);
+  } else if(mode === 'offline'){
+    render({ online:false, link:null, ts:new Date() });
+    logLine('status: offline — no reachable link');
+  } else if(mode === 'searching'){
+    render({ online:null, link:null, ts:null });
+    logLine('status: searching for a link…');
+  }
+}
+
+/* ------------------------------------------------------------
+   LIVE MODE — uncomment once FIREBASE_CONFIG above is filled in.
+   Loads Firebase via CDN, reads /device/status, and re-renders
+   every time the ESP32 writes a new value there. Requires
+   Realtime Database rules that allow public read for this demo
+   (fine for a non-commercial student project — do not use
+   permissive rules on anything with sensitive data).
+------------------------------------------------------------
+function startLiveMode(){
+  const s1 = document.createElement('script');
+  s1.src = "https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js";
+  document.head.appendChild(s1);
+  s1.onload = () => {
+    const s2 = document.createElement('script');
+    s2.src = "https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js";
+    document.head.appendChild(s2);
+    s2.onload = () => {
+      firebase.initializeApp(FIREBASE_CONFIG);
+      const ref = firebase.database().ref('device/status');
+      ref.on('value', snap => {
+        const val = snap.val();
+        if(!val) return;
+        render({
+          online: val.online,
+          link: val.link,
+          ts: val.lastSeen ? new Date(val.lastSeen) : new Date()
+        });
+        logLine(`live update: ${val.online ? 'online' : 'offline'}${val.link ? ' · ' + val.link : ''}`);
+      });
+    };
+  };
+}
+startLiveMode();
+------------------------------------------------------------ */
+</script>
+
+</body>
+</html>
