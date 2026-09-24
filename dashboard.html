@@ -186,11 +186,11 @@
 
 <script>
 const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyCeGwiHATO-1Dg4zY3nrbTzb0GG2h7Sm_A",
+  apiKey: "YOUR_API_KEY",
   authDomain: "iot-4g-based-smart-vehicle.firebaseapp.com",
   databaseURL: "https://iot-4g-based-smart-vehicle-default-rtdb.firebaseio.com",
   projectId: "iot-4g-based-smart-vehicle",
-  appId: "1:6008451577:web:e9da521ece03e7b0c68d28"
+  appId: "YOUR_APP_ID"
 };
 
 firebase.initializeApp(FIREBASE_CONFIG);
@@ -245,11 +245,19 @@ function initCharts(){
 
 // ---------------- DEVICES ----------------
 function initApp(){
-  initCharts();
-  listenDevices();
-  listenNotifications();
-  if(myRole === 'admin'){ listenUsers(); document.getElementById('seedBtn').onclick = seedDemoFleet; }
-  document.getElementById('createUserBtn').onclick = createUser;
+  // Each piece is isolated: if one fails (e.g. the Chart.js CDN is
+  // blocked), the rest of the app — buttons, listeners, other tabs —
+  // still works instead of the whole page going unresponsive.
+  try{ initCharts(); } catch(e){ console.error('Chart init failed:', e); }
+  try{ listenDevices(); } catch(e){ console.error('Device listener failed:', e); }
+  try{ listenNotifications(); } catch(e){ console.error('Notifications listener failed:', e); }
+  if(myRole === 'admin'){
+    try{ listenUsers(); } catch(e){ console.error('User listener failed:', e); }
+    const seedBtn = document.getElementById('seedBtn');
+    if(seedBtn) seedBtn.onclick = seedDemoFleet;
+  }
+  const createBtn = document.getElementById('createUserBtn');
+  if(createBtn) createBtn.onclick = createUser;
 }
 
 function listenDevices(){
@@ -261,6 +269,7 @@ function listenDevices(){
 }
 
 function renderCharts(devices){
+  if(!deviceChart || !taskChart) return; // charts never initialized (e.g. CDN blocked) — skip safely
   let online = 0, offline = 0, pick = 0, drop = 0, idle = 0;
   Object.values(devices).forEach(d => {
     if(d.status && d.status.online) online++; else offline++;
