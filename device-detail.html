@@ -137,14 +137,9 @@
       <button class="btn outline" id="clearRoute">Clear selection</button>
     </div>
     <hr style="border-color:#2a333a;margin:18px 0;">
-    <div class="route-fields">
-      <div class="f">
-        <label>CURRENT LOCATION (manual — real indoor tracking not wired up yet)</label>
-        <select id="currentRoom"></select>
-      </div>
-      <div class="f" style="flex:0 0 auto; align-self:flex-end;">
-        <button class="btn outline" id="setLocation">Update location</button>
-      </div>
+    <div class="row-gap" style="align-items:center;">
+      <button class="btn outline" id="setLocationBtn">Click map to set current location</button>
+      <span id="setLocationHint" style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--dim);"></span>
     </div>
   </div>
 
@@ -223,9 +218,11 @@ if(!deviceId){ window.location.href = 'dashboard.html'; }
 let currentUser = null;
 let myRole = null;
 let manualEnabled = false;
-let lastTelemetryRoom = null;
+let lastMapX = null;
+let lastMapY = null;
 let lastOnline = false;
 let routeFieldsInitialized = false;
+let placingLocation = false;
 
 auth.onAuthStateChanged(user => {
   if(!user){ window.location.href = 'index.html'; return; }
@@ -247,7 +244,6 @@ document.getElementById('signOutBtn').onclick = () => auth.signOut();
 function initPanel(){
   populateRoomSelect(document.getElementById('pickup'));
   populateRoomSelect(document.getElementById('dest'));
-  populateRoomSelect(document.getElementById('currentRoom'));
 
   document.getElementById('pickup').onchange = renderMap;
   document.getElementById('dest').onchange = renderMap;
@@ -261,10 +257,12 @@ function initPanel(){
     pickup: document.getElementById('pickup').value,
     destination: document.getElementById('dest').value
   });
-  document.getElementById('setLocation').onclick = () => {
-    const room = document.getElementById('currentRoom').value;
-    if(!room) return;
-    db.ref('devices/' + deviceId + '/telemetry/room').set(room);
+
+  document.getElementById('setLocationBtn').onclick = (e) => {
+    placingLocation = !placingLocation;
+    e.target.textContent = placingLocation ? 'Click anywhere on the map below…' : 'Click map to set current location';
+    document.getElementById('setLocationHint').textContent = placingLocation ? 'Click a room or corridor to place the vehicle there.' : '';
+    renderMap();
   };
 
   document.getElementById('videoToggle').onclick = (e) => {
@@ -307,11 +305,18 @@ function initPanel(){
 function renderMap(){
   const svg = document.getElementById('floorSvg');
   if(!svg || typeof renderFloorPlan !== 'function') return;
-  const devices = lastTelemetryRoom ? [{ id: deviceId, room: lastTelemetryRoom, online: lastOnline, shortLabel: deviceId }] : [];
+  const devices = (lastMapX != null && lastMapY != null)
+    ? [{ id: deviceId, x: lastMapX, y: lastMapY, online: lastOnline, shortLabel: deviceId }] : [];
   renderFloorPlan(svg, {
     devices,
     highlightPickup: document.getElementById('pickup').value || null,
-    highlightDest: document.getElementById('dest').value || null
+    highlightDest: document.getElementById('dest').value || null,
+    onMapClick: placingLocation ? (point) => {
+      db.ref('devices/' + deviceId + '/telemetry').update({ mapX: point.x, mapY: point.y });
+      placingLocation = false;
+      document.getElementById('setLocationBtn').textContent = 'Click map to set current location';
+      document.getElementById('setLocationHint').textContent = '';
+    } : null
   });
 }
 
@@ -321,12 +326,14 @@ function meterClass(val){
 
 function renderDeviceState(d){
   const telem = d.telemetry || {};
-  lastTelemetryRoom = telem.room || null;
+  lastMapX = typeof telem.mapX === 'number' ? telem.mapX : null;
+  lastMapY = typeof telem.mapY === 'number' ? telem.mapY : null;
   lastOnline = !!(d.status && d.status.online);
+  const nearRoom = (lastMapX != null && lastMapY != null && typeof roomAtPoint === 'function') ? roomAtPoint(lastMapX, lastMapY) : null;
   document.getElementById('telem').innerHTML = `
     <div class="t"><div class="k">SPEED</div><div class="v">${telem.speed ?? '—'} km/h</div></div>
     <div class="t"><div class="k">BATTERY</div><div class="v">${telem.battery ?? '—'}%</div></div>
-    <div class="t"><div class="k">CURRENT ROOM</div><div class="v" style="font-size:12px;">${lastTelemetryRoom ? (roomById(lastTelemetryRoom) || {label:lastTelemetryRoom}).label : 'Unknown'}</div></div>
+    <div class="t"><div class="k">CURRENT LOCATION</div><div class="v" style="font-size:12px;">${nearRoom ? nearRoom.label : (lastMapX != null ? 'On floor' : 'Not set')}</div></div>
     <div class="t"><div class="k">TASK</div><div class="v" style="font-size:12px;">${telem.task || 'idle'}</div></div>
   `;
 
