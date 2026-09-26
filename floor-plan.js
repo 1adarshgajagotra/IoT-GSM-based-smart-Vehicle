@@ -1,6 +1,8 @@
 // Shared hospital floor plan — loaded by both dashboard.html (all vehicles)
 // and device-detail.html (one vehicle). Room + corridor layout mirrors the
-// reference "City Hospital First Floor Layout (20 Rooms)" image.
+// reference "City Hospital First Floor Layout (20 Rooms)" image, including
+// the actual walkable loop corridor around the middle block and the spine
+// corridor down to the main entrance.
 // viewBox is fixed at 0 0 1240 900 across every page that uses this file.
 
 const FLOORPLAN_VIEWBOX = { w: 1240, h: 900 };
@@ -16,36 +18,43 @@ const HOSPITAL_ROOMS = [
   { id:'7',  label:'7 · General Ward',  type:'ward',     x:928,  y:10, w:148, h:140 },
   { id:'8',  label:'8 · General Ward',  type:'ward',     x:1081, y:10, w:149, h:140 },
 
-  // Top corridor — a real walkable passage, not just gap between rooms
-  { id:'corridor-top', label:'Corridor', type:'corridor', x:10, y:150, w:1220, h:45 },
+  // Top corridor (horizontal band, full width)
+  { id:'corridor-top', label:'', type:'corridor', x:10, y:150, w:1220, h:45 },
 
-  // Middle block
-  { id:'20', label:'20 · Storage',    type:'storage', x:10,  y:195, w:148, h:195 },
-  { id:'19', label:'19 · Staff Room', type:'staff',   x:10,  y:400, w:148, h:195 },
+  // Middle block, with a thin walkway corridor down each inner edge so the
+  // top and bottom corridors connect into one continuous loop around it.
+  { id:'20', label:'20 · Storage',    type:'storage', x:10,  y:195, w:140, h:195 },
+  { id:'19', label:'19 · Staff Room', type:'staff',   x:10,  y:400, w:140, h:195 },
+  { id:'corridor-left', label:'', type:'corridor', x:150, y:195, w:20, h:400 },
+
   { id:'stairs',      label:'Stairs',          type:'common', x:170, y:195, w:110, h:400 },
   { id:'elevator',    label:'Elevator',        type:'common', x:290, y:195, w:110, h:400 },
   { id:'male-wash',   label:'Male Washroom',   type:'wash',   x:410, y:195, w:110, h:195 },
   { id:'female-wash', label:'Female Washroom', type:'wash',   x:410, y:400, w:110, h:195 },
-  { id:'waiting',     label:'Waiting Area',    type:'common', x:530, y:195, w:390, h:300 },
-  { id:'reception',   label:'Reception',       type:'reception', x:530, y:495, w:390, h:100 },
+  { id:'waiting',     label:'Waiting Area',    type:'common', x:530, y:195, w:380, h:300 },
+  { id:'reception',   label:'Reception',       type:'reception', x:530, y:495, w:380, h:100 },
+
+  { id:'corridor-right', label:'', type:'corridor', x:910, y:195, w:20, h:400 },
   { id:'9',  label:'9 · Diagnostics (X-Ray/USG)', type:'diagnostics', x:930, y:195, w:149, h:195 },
   { id:'10', label:'10 · Equipment',              type:'storage',     x:930, y:400, w:149, h:195 },
 
-  // Bottom corridor
-  { id:'corridor-bottom', label:'Corridor', type:'corridor', x:10, y:595, w:1220, h:45 },
+  // Bottom corridor (horizontal band, full width)
+  { id:'corridor-bottom', label:'', type:'corridor', x:10, y:595, w:1220, h:45 },
 
-  // Bottom row
-  { id:'11', label:'11 · General Ward',  type:'ward',      x:10,   y:640, w:148, h:140 },
-  { id:'12', label:'12 · General Ward',  type:'ward',      x:163,  y:640, w:148, h:140 },
-  { id:'13', label:'13 · General Ward',  type:'ward',      x:316,  y:640, w:148, h:140 },
-  { id:'14', label:'14 · Isolation',     type:'isolation', x:469,  y:640, w:148, h:140 },
-  { id:'15', label:'15 · Consultation',  type:'consult',   x:622,  y:640, w:148, h:140 },
-  { id:'16', label:'16 · Male Washroom', type:'wash',      x:775,  y:640, w:148, h:140 },
-  { id:'17', label:'17 · General Ward',  type:'ward',      x:928,  y:640, w:148, h:140 },
-  { id:'18', label:'18 · General Ward',  type:'ward',      x:1081, y:640, w:149, h:140 },
+  // Bottom row — with a corridor gap between rooms 14 and 15 (near the true
+  // horizontal center) forming the spine down to the main entrance below.
+  { id:'11', label:'11 · General Ward',  type:'ward',      x:10,  y:640, w:144, h:140 },
+  { id:'12', label:'12 · General Ward',  type:'ward',      x:159, y:640, w:144, h:140 },
+  { id:'13', label:'13 · General Ward',  type:'ward',      x:308, y:640, w:144, h:140 },
+  { id:'14', label:'14 · Isolation',     type:'isolation', x:457, y:640, w:144, h:140 },
+  { id:'corridor-entrance-spine', label:'', type:'corridor', x:601, y:640, w:37, h:140 },
+  { id:'15', label:'15 · Consultation',  type:'consult',   x:638, y:640, w:144, h:140 },
+  { id:'16', label:'16 · Male Washroom', type:'wash',      x:787, y:640, w:144, h:140 },
+  { id:'17', label:'17 · General Ward',  type:'ward',      x:936, y:640, w:144, h:140 },
+  { id:'18', label:'18 · General Ward',  type:'ward',      x:1085,y:640, w:145, h:140 },
 
   // Entrance corridor + main entrance
-  { id:'corridor-entrance', label:'Corridor', type:'corridor', x:560, y:780, w:120, h:60 },
+  { id:'corridor-entrance', label:'', type:'corridor', x:560, y:780, w:120, h:60 },
   { id:'entrance', label:'Main Entrance', type:'common', x:560, y:840, w:120, h:60 }
 ];
 
@@ -59,7 +68,7 @@ const DELIVERY_ROOM_IDS = HOSPITAL_ROOMS
 const ROOM_TYPE_COLOR = {
   ward:'#2c5f8a', consult:'#2f7a52', pharmacy:'#8a3a4a', diagnostics:'#5a4a8a',
   isolation:'#8a4a2c', wash:'#3a4a56', storage:'#7a6a2c', staff:'#2c6a6a',
-  common:'#2a333a', reception:'#5a5a2c', corridor:'#1c2429'
+  common:'#2a333a', reception:'#5a5a2c', corridor:'#22303a'
 };
 
 function roomById(id){ return HOSPITAL_ROOMS.find(r => r.id === id); }
@@ -73,15 +82,15 @@ function roomAtPoint(x, y){
 function floorPlanRoomsSVG(){
   return HOSPITAL_ROOMS.map(r => {
     const isCorridor = r.type === 'corridor';
-    const labelSize = isCorridor ? 10 : 12;
-    const labelOpacity = isCorridor ? 0.5 : 1;
+    // Skip labels on narrow corridor strips — text wouldn't fit and just clutters the map.
+    const showLabel = r.label && r.w >= 50 && r.h >= 30;
     return `
     <g class="fp-room" data-room="${r.id}">
       <rect data-base-fill="${ROOM_TYPE_COLOR[r.type]}${isCorridor ? '' : '22'}" data-base-stroke="${ROOM_TYPE_COLOR[r.type]}"
-        x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="4"
+        x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" rx="${isCorridor ? 2 : 4}"
         fill="${ROOM_TYPE_COLOR[r.type]}${isCorridor ? '' : '22'}" stroke="${ROOM_TYPE_COLOR[r.type]}" stroke-width="1"></rect>
-      <text x="${r.x + r.w/2}" y="${r.y + r.h/2}" text-anchor="middle" dominant-baseline="middle"
-        font-size="${labelSize}" fill="#c7d0d5" opacity="${labelOpacity}" style="pointer-events:none;">${r.label}</text>
+      ${showLabel ? `<text x="${r.x + r.w/2}" y="${r.y + r.h/2}" text-anchor="middle" dominant-baseline="middle"
+        font-size="${isCorridor ? 10 : 12}" fill="#c7d0d5" opacity="${isCorridor ? 0.5 : 1}" style="pointer-events:none;">${r.label}</text>` : ''}
     </g>`;
   }).join('');
 }
