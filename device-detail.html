@@ -9,6 +9,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="floor-plan.js"></script>
 <style>
   :root{
     --bg:#0f1417; --panel:#171e23; --panel2:#1c252b; --line:#2a333a;
@@ -61,7 +62,7 @@
   .route-fields{ display:flex; gap:12px; margin-top:14px; flex-wrap:wrap; }
   .route-fields .f{ flex:1; min-width:180px; }
   .route-fields label{ font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--dim); display:block; margin-bottom:5px; }
-  .route-fields input{ width:100%; background:#0f1417; border:1px solid var(--line); border-radius:6px; color:var(--text); padding:8px 10px; font-size:13px; }
+  .route-fields input, .route-fields select{ width:100%; background:#0f1417; border:1px solid var(--line); border-radius:6px; color:var(--text); padding:8px 10px; font-size:13px; }
 
   .meter-row{ display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
   .meter .k{ font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--mdim); margin-bottom:6px; }
@@ -120,36 +121,30 @@
   </div>
 
   <div class="panel">
-    <h3>HOSPITAL FLOOR MAP — click a room to set Pickup, click again elsewhere for Destination</h3>
-    <div class="floor-map-wrap">
-      <svg viewBox="0 0 620 260" id="floorSvg">
-        <g class="corridor"><rect x="10" y="90" width="600" height="30"></rect></g>
-
-        <g class="room" data-room="Reception"><rect x="10" y="10" width="110" height="65" rx="4"></rect><text x="65" y="47" text-anchor="middle">Reception</text></g>
-        <g class="room" data-room="ICU"><rect x="135" y="10" width="110" height="65" rx="4"></rect><text x="190" y="47" text-anchor="middle">ICU</text></g>
-        <g class="room" data-room="Ward A"><rect x="260" y="10" width="110" height="65" rx="4"></rect><text x="315" y="47" text-anchor="middle">Ward A</text></g>
-        <g class="room" data-room="Ward B"><rect x="385" y="10" width="110" height="65" rx="4"></rect><text x="440" y="47" text-anchor="middle">Ward B</text></g>
-        <g class="room" data-room="Elevator"><rect x="510" y="10" width="100" height="65" rx="4"></rect><text x="560" y="47" text-anchor="middle">Elevator</text></g>
-
-        <g class="room" data-room="Nurse Station"><rect x="10" y="135" width="110" height="65" rx="4"></rect><text x="65" y="172" text-anchor="middle">Nurse Station</text></g>
-        <g class="room" data-room="Pharmacy"><rect x="135" y="135" width="110" height="65" rx="4"></rect><text x="190" y="172" text-anchor="middle">Pharmacy</text></g>
-        <g class="room" data-room="Store Room"><rect x="260" y="135" width="110" height="65" rx="4"></rect><text x="315" y="172" text-anchor="middle">Store Room</text></g>
-        <g class="room" data-room="Lab"><rect x="385" y="135" width="110" height="65" rx="4"></rect><text x="440" y="172" text-anchor="middle">Lab</text></g>
-        <g class="room" data-room="Discharge Bay"><rect x="510" y="135" width="100" height="65" rx="4"></rect><text x="560" y="168" text-anchor="middle">Discharge</text><text x="560" y="180" text-anchor="middle">Bay</text></g>
-      </svg>
-      <div class="map-legend">
-        <span><span class="legend-dot" style="background:#33d17a;"></span>Pickup</span>
-        <span><span class="legend-dot" style="background:#4d8fe0;"></span>Destination</span>
-        <span style="opacity:0.7;">(demo floor plan — not tied to live GPS positioning yet)</span>
-      </div>
+    <h3>HOSPITAL FLOOR MAP</h3>
+    <svg id="floorSvg" style="width:100%; height:auto; display:block;"></svg>
+    <div class="map-legend">
+      <span><span class="legend-dot" style="background:#33d17a;"></span>Pickup room</span>
+      <span><span class="legend-dot" style="background:#4d8fe0;"></span>Destination room</span>
+      <span style="opacity:0.7;">Marker = this vehicle's current location</span>
     </div>
     <div class="route-fields">
-      <div class="f"><label>PICKUP POINT</label><input id="pickup"></div>
-      <div class="f"><label>DESTINATION POINT</label><input id="dest"></div>
+      <div class="f"><label>PICKUP POINT</label><select id="pickup"></select></div>
+      <div class="f"><label>DESTINATION POINT</label><select id="dest"></select></div>
     </div>
     <div class="row-gap" style="margin-top:12px;">
       <button class="btn" id="sendRoute">Send route</button>
       <button class="btn outline" id="clearRoute">Clear selection</button>
+    </div>
+    <hr style="border-color:#2a333a;margin:18px 0;">
+    <div class="route-fields">
+      <div class="f">
+        <label>CURRENT LOCATION (manual — real indoor tracking not wired up yet)</label>
+        <select id="currentRoom"></select>
+      </div>
+      <div class="f" style="flex:0 0 auto; align-self:flex-end;">
+        <button class="btn outline" id="setLocation">Update location</button>
+      </div>
     </div>
   </div>
 
@@ -228,7 +223,9 @@ if(!deviceId){ window.location.href = 'dashboard.html'; }
 let currentUser = null;
 let myRole = null;
 let manualEnabled = false;
-let mapSelection = { pickup:null, dest:null };
+let lastTelemetryRoom = null;
+let lastOnline = false;
+let routeFieldsInitialized = false;
 
 auth.onAuthStateChanged(user => {
   if(!user){ window.location.href = 'index.html'; return; }
@@ -248,27 +245,27 @@ auth.onAuthStateChanged(user => {
 document.getElementById('signOutBtn').onclick = () => auth.signOut();
 
 function initPanel(){
-  // Floor map room clicks: first click sets pickup, second sets destination,
-  // clicking the same room again clears it.
-  document.querySelectorAll('#floorSvg .room').forEach(g => {
-    g.onclick = () => {
-      const name = g.dataset.room;
-      if(mapSelection.pickup === name){ mapSelection.pickup = null; }
-      else if(mapSelection.dest === name){ mapSelection.dest = null; }
-      else if(!mapSelection.pickup){ mapSelection.pickup = name; }
-      else if(!mapSelection.dest && name !== mapSelection.pickup){ mapSelection.dest = name; }
-      else { mapSelection.dest = name; }
-      renderMapSelection();
-    };
-  });
+  populateRoomSelect(document.getElementById('pickup'));
+  populateRoomSelect(document.getElementById('dest'));
+  populateRoomSelect(document.getElementById('currentRoom'));
+
+  document.getElementById('pickup').onchange = renderMap;
+  document.getElementById('dest').onchange = renderMap;
+
   document.getElementById('clearRoute').onclick = () => {
-    mapSelection = { pickup:null, dest:null };
-    renderMapSelection();
+    document.getElementById('pickup').value = '';
+    document.getElementById('dest').value = '';
+    renderMap();
   };
   document.getElementById('sendRoute').onclick = () => sendControl({
     pickup: document.getElementById('pickup').value,
     destination: document.getElementById('dest').value
   });
+  document.getElementById('setLocation').onclick = () => {
+    const room = document.getElementById('currentRoom').value;
+    if(!room) return;
+    db.ref('devices/' + deviceId + '/telemetry/room').set(room);
+  };
 
   document.getElementById('videoToggle').onclick = (e) => {
     const box = document.getElementById('videoPlaceholder');
@@ -307,14 +304,15 @@ function initPanel(){
   db.ref('devices/' + deviceId + '/messages').limitToLast(20).on('value', snap => renderMessages(snap.val() || {}));
 }
 
-function renderMapSelection(){
-  document.querySelectorAll('#floorSvg .room').forEach(g => {
-    g.classList.remove('pickup','dest');
-    if(g.dataset.room === mapSelection.pickup) g.classList.add('pickup');
-    if(g.dataset.room === mapSelection.dest) g.classList.add('dest');
+function renderMap(){
+  const svg = document.getElementById('floorSvg');
+  if(!svg || typeof renderFloorPlan !== 'function') return;
+  const devices = lastTelemetryRoom ? [{ id: deviceId, room: lastTelemetryRoom, online: lastOnline, shortLabel: deviceId }] : [];
+  renderFloorPlan(svg, {
+    devices,
+    highlightPickup: document.getElementById('pickup').value || null,
+    highlightDest: document.getElementById('dest').value || null
   });
-  document.getElementById('pickup').value = mapSelection.pickup || '';
-  document.getElementById('dest').value = mapSelection.dest || '';
 }
 
 function meterClass(val){
@@ -323,10 +321,12 @@ function meterClass(val){
 
 function renderDeviceState(d){
   const telem = d.telemetry || {};
+  lastTelemetryRoom = telem.room || null;
+  lastOnline = !!(d.status && d.status.online);
   document.getElementById('telem').innerHTML = `
     <div class="t"><div class="k">SPEED</div><div class="v">${telem.speed ?? '—'} km/h</div></div>
     <div class="t"><div class="k">BATTERY</div><div class="v">${telem.battery ?? '—'}%</div></div>
-    <div class="t"><div class="k">GPS</div><div class="v" style="font-size:12px;">${telem.lat ? telem.lat.toFixed(4)+', '+telem.lng.toFixed(4) : '—'}</div></div>
+    <div class="t"><div class="k">CURRENT ROOM</div><div class="v" style="font-size:12px;">${lastTelemetryRoom ? (roomById(lastTelemetryRoom) || {label:lastTelemetryRoom}).label : 'Unknown'}</div></div>
     <div class="t"><div class="k">TASK</div><div class="v" style="font-size:12px;">${telem.task || 'idle'}</div></div>
   `;
 
@@ -342,6 +342,13 @@ function renderDeviceState(d){
   set('meterBattery', 'meterBatteryVal', telem.battery);
 
   const activeSource = (d.control && d.control.activeSource) || 'operator';
+  if(!routeFieldsInitialized){
+    const activeControl = (d.control && d.control[activeSource]) || {};
+    if(activeControl.pickup) document.getElementById('pickup').value = activeControl.pickup;
+    if(activeControl.destination) document.getElementById('dest').value = activeControl.destination;
+    routeFieldsInitialized = true;
+  }
+  renderMap();
   const eStop = d.control && d.control.emergencyStopGlobal;
   let bannerHtml = '';
   if(activeSource === 'admin'){
@@ -356,7 +363,7 @@ function renderDeviceState(d){
   if(releaseBtn) releaseBtn.onclick = () => db.ref('devices/' + deviceId + '/control/activeSource').set('operator');
 
   const disableForOperator = (myRole !== 'admin' && activeSource === 'admin');
-  document.querySelectorAll('.panel button, .panel input').forEach(el => {
+  document.querySelectorAll('.panel button, .panel input, .panel select').forEach(el => {
     if(el.id !== 'signOutBtn') el.disabled = disableForOperator;
   });
 }
