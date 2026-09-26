@@ -41,56 +41,29 @@
   .view{ display:none; padding:26px; max-width:1180px; margin:0 auto; }
   .view.active{ display:block; }
 
-  .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:18px; }
   .grid3{ display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:18px; }
   .panel{ background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:20px; }
   .panel h3{ margin:0 0 14px 0; font-size:13.5px; font-family:'IBM Plex Mono',monospace; color:var(--dim); font-weight:500; }
   .chart-wrap{ height:220px; display:flex; align-items:center; justify-content:center; }
 
   .device-list{ display:flex; flex-direction:column; gap:10px; margin-top:16px; }
-  .device-row{ background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px 18px; }
-  .device-row .head{ display:flex; align-items:center; justify-content:space-between; cursor:pointer; }
+  .device-row{
+    background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px 18px;
+    display:flex; align-items:center; justify-content:space-between; cursor:pointer; text-decoration:none;
+  }
+  .device-row:hover{ border-color:var(--blue); }
   .device-head-left{ display:flex; align-items:center; gap:12px; }
   .dot{ width:10px; height:10px; border-radius:50%; flex-shrink:0; }
   .dot.on{ background:var(--green); } .dot.off{ background:var(--red); }
-  .dname{ font-weight:600; font-size:14.5px; }
+  .dname{ font-weight:600; font-size:14.5px; color:var(--text); }
   .dmeta{ font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--mdim); }
   .sim-badge{ font-size:10px; background:#5b6b7430; color:var(--dim); padding:2px 7px; border-radius:4px; margin-left:8px; }
-  .chevron{ color:var(--mdim); font-size:12px; }
+  .chevron{ color:var(--mdim); font-size:14px; }
 
-  .device-body{ display:none; margin-top:16px; border-top:1px solid var(--line); padding-top:16px; }
-  .device-body.open{ display:block; }
-  .override-banner{
-    background:#a682e820; border:1px solid #a682e860; color:var(--purple); border-radius:8px;
-    padding:9px 13px; font-size:12.5px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center;
-  }
-  .override-banner button{
-    background:transparent; border:1px solid var(--purple); color:var(--purple); border-radius:5px;
-    padding:4px 10px; font-size:11.5px; cursor:pointer;
-  }
-  .ctrl-grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-  .field-sm label{ font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--dim); display:block; margin-bottom:5px; }
-  .field-sm input{
-    width:100%; background:#0f1417; border:1px solid var(--line); border-radius:6px; color:var(--text);
-    padding:8px 10px; font-size:13px; margin-bottom:10px;
-  }
   .btn{ background:var(--blue); border:none; color:#0b1116; font-weight:600; padding:8px 14px; border-radius:6px; cursor:pointer; font-size:12.5px; }
   .btn.red{ background:var(--red); } .btn.grey{ background:var(--line); color:var(--text); }
   .btn.outline{ background:transparent; border:1px solid var(--line); color:var(--text); }
   .btn:disabled{ opacity:0.45; cursor:default; }
-  .dpad{ display:grid; grid-template-columns:repeat(3,44px); grid-template-rows:repeat(2,40px); gap:6px; margin:10px 0; }
-  .dpad button{ font-size:12px; }
-  .telemetry-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:14px; }
-  .telemetry-grid .t{ background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:10px 12px; }
-  .telemetry-grid .t .k{ font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--mdim); }
-  .telemetry-grid .t .v{ font-size:15px; font-weight:600; margin-top:3px; }
-
-  .msg-log{ background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:10px 12px;
-    height:110px; overflow-y:auto; font-family:'IBM Plex Mono',monospace; font-size:12px; margin-bottom:8px; }
-  .msg-log div{ margin-bottom:5px; color:var(--dim); }
-  .msg-log div b{ color:var(--text); }
-  .msg-send{ display:flex; gap:8px; }
-  .msg-send input{ flex:1; background:#0f1417; border:1px solid var(--line); border-radius:6px; color:var(--text); padding:8px 10px; }
 
   .notif-row{ display:flex; gap:12px; padding:12px 16px; border-bottom:1px solid var(--line); align-items:flex-start; }
   .notif-row:last-child{ border-bottom:none; }
@@ -159,7 +132,7 @@
 <!-- DEVICES -->
 <div class="view" id="view-devices">
   <div class="panel">
-    <h3>FLEET (<span id="deviceCount">0</span> devices)</h3>
+    <h3>FLEET (<span id="deviceCount">0</span> devices) — click a device to open its control panel</h3>
     <div class="device-list" id="deviceList"></div>
   </div>
 </div>
@@ -270,7 +243,7 @@ function initCharts(){
     options: legendWhite });
 }
 
-// ---------------- DEVICES ----------------
+// ---------------- INIT ----------------
 function initApp(){
   // Each piece is isolated: if one fails (e.g. the Chart.js CDN is
   // blocked), the rest of the app — buttons, listeners, other tabs —
@@ -287,6 +260,7 @@ function initApp(){
   if(createBtn) createBtn.onclick = createUser;
 }
 
+// ---------------- DEVICES ----------------
 function listenDevices(){
   db.ref('devices').on('value', snap => {
     const devices = snap.val() || {};
@@ -338,160 +312,19 @@ function renderDeviceList(devices){
     const d = devices[id];
     const online = d.status && d.status.online;
     const link = (d.status && d.status.link) || '—';
-    const row = document.createElement('div');
+    const row = document.createElement('a');
     row.className = 'device-row';
+    row.href = 'device-detail.html?id=' + encodeURIComponent(id);
     row.innerHTML = `
-      <div class="head" data-id="${id}">
-        <div class="device-head-left">
-          <span class="dot ${online ? 'on' : 'off'}"></span>
-          <span class="dname">${id}${id !== REAL_DEVICE_ID ? '<span class="sim-badge">simulated</span>' : ''}</span>
-          <span class="dmeta">${online ? 'ONLINE' : 'OFFLINE'} · ${link.toUpperCase()}</span>
-        </div>
-        <span class="chevron">▾</span>
+      <div class="device-head-left">
+        <span class="dot ${online ? 'on' : 'off'}"></span>
+        <span class="dname">${id}${id !== REAL_DEVICE_ID ? '<span class="sim-badge">simulated</span>' : ''}</span>
+        <span class="dmeta">${online ? 'ONLINE' : 'OFFLINE'} · ${link.toUpperCase()}</span>
       </div>
-      <div class="device-body" id="body-${id}"></div>
+      <span class="chevron">›</span>
     `;
-    row.querySelector('.head').onclick = () => toggleDevice(id);
     list.appendChild(row);
   });
-}
-
-let openDeviceId = null;
-let deviceListeners = {};
-function toggleDevice(id){
-  const body = document.getElementById('body-' + id);
-  if(openDeviceId === id){
-    body.classList.remove('open'); openDeviceId = null;
-    if(deviceListeners[id]){ deviceListeners[id](); delete deviceListeners[id]; }
-    return;
-  }
-  if(openDeviceId){
-    document.getElementById('body-' + openDeviceId)?.classList.remove('open');
-    if(deviceListeners[openDeviceId]){ deviceListeners[openDeviceId](); delete deviceListeners[openDeviceId]; }
-  }
-  openDeviceId = id;
-  body.classList.add('open');
-  renderDeviceControls(id, body);
-}
-
-function renderDeviceControls(id, body){
-  body.innerHTML = `
-    <div id="banner-${id}"></div>
-    <div class="telemetry-grid" id="telem-${id}"></div>
-    <div class="ctrl-grid">
-      <div>
-        <div class="field-sm">
-          <label>PICKUP POINT</label><input id="pickup-${id}">
-          <label>DESTINATION POINT</label><input id="dest-${id}">
-        </div>
-        <button class="btn" id="sendRoute-${id}">Send route</button>
-        <hr style="border-color:#2a333a;margin:14px 0;">
-        <button class="btn red" id="estop-${id}">EMERGENCY STOP</button>
-        <button class="btn grey" id="estopClear-${id}" style="margin-left:8px;">Clear stop</button>
-      </div>
-      <div>
-        <div class="field-sm"><label>MANUAL CONTROL</label></div>
-        <button class="btn outline" id="manualToggle-${id}">Enable manual control</button>
-        <div class="dpad" id="dpad-${id}" style="display:none;">
-          <span></span><button data-dir="F">▲</button><span></span>
-          <button data-dir="L">◀</button><button class="red" data-dir="STOP">■</button><button data-dir="R">▶</button>
-          <span></span><button data-dir="B">▼</button><span></span>
-        </div>
-        ${myRole === 'admin' ? `<div style="margin-top:14px;"><button class="btn" id="overrideBtn-${id}">Take control (override)</button></div>` : ''}
-      </div>
-    </div>
-    <h3 style="margin-top:18px;">TWO-WAY MESSAGES</h3>
-    <div class="msg-log" id="msglog-${id}"></div>
-    <div class="msg-send"><input id="msgInput-${id}" placeholder="Message to vehicle…"><button class="btn" id="msgSend-${id}">Send</button></div>
-  `;
-
-  const deviceRef = db.ref('devices/' + id);
-  const unsub1 = deviceRef.on('value', snap => renderDeviceState(id, snap.val() || {}));
-  const msgRef = db.ref('devices/' + id + '/messages').limitToLast(20);
-  const unsub2 = msgRef.on('value', snap => renderMessages(id, snap.val() || {}));
-
-  deviceListeners[id] = () => { deviceRef.off('value', unsub1); msgRef.off('value', unsub2); };
-
-  document.getElementById('sendRoute-' + id).onclick = () => sendControl(id, {
-    pickup: document.getElementById('pickup-' + id).value,
-    destination: document.getElementById('dest-' + id).value
-  });
-  document.getElementById('estop-' + id).onclick = () =>
-    db.ref('devices/' + id + '/control/emergencyStopGlobal').set({ active:true, by: currentUser.email, role: myRole, ts: Date.now() });
-  document.getElementById('estopClear-' + id).onclick = () =>
-    db.ref('devices/' + id + '/control/emergencyStopGlobal').set({ active:false, by: currentUser.email, role: myRole, ts: Date.now() });
-
-  document.getElementById('manualToggle-' + id).onclick = (e) => {
-    const dpad = document.getElementById('dpad-' + id);
-    const enabling = dpad.style.display === 'none';
-    dpad.style.display = enabling ? 'grid' : 'none';
-    e.target.textContent = enabling ? 'Disable manual control' : 'Enable manual control';
-    sendControl(id, { mode: enabling ? 'manual' : 'auto' });
-  };
-  document.querySelectorAll('#dpad-' + id + ' button').forEach(b => {
-    b.onclick = () => sendControl(id, { manualDir: b.dataset.dir, manualTs: Date.now() });
-  });
-
-  if(myRole === 'admin'){
-    document.getElementById('overrideBtn-' + id).onclick = () => {
-      db.ref('devices/' + id + '/control/activeSource').set('admin');
-    };
-  }
-
-  document.getElementById('msgSend-' + id).onclick = () => {
-    const input = document.getElementById('msgInput-' + id);
-    if(!input.value.trim()) return;
-    db.ref('devices/' + id + '/messages').push({ from: currentUser.email, role: myRole, text: input.value.trim(), ts: Date.now() });
-    input.value = '';
-  };
-}
-
-function renderDeviceState(id, d){
-  const telem = d.telemetry || {};
-  document.getElementById('telem-' + id).innerHTML = `
-    <div class="t"><div class="k">SPEED</div><div class="v">${telem.speed ?? '—'} km/h</div></div>
-    <div class="t"><div class="k">BATTERY</div><div class="v">${telem.battery ?? '—'}%</div></div>
-    <div class="t"><div class="k">GPS</div><div class="v" style="font-size:12px;">${telem.lat ? telem.lat.toFixed(4)+', '+telem.lng.toFixed(4) : '—'}</div></div>
-    <div class="t"><div class="k">TASK</div><div class="v" style="font-size:12px;">${telem.task || 'idle'}</div></div>
-  `;
-  const activeSource = (d.control && d.control.activeSource) || 'operator';
-  const eStop = d.control && d.control.emergencyStopGlobal;
-  const banner = document.getElementById('banner-' + id);
-  let bannerHtml = '';
-  if(activeSource === 'admin'){
-    bannerHtml += `<div class="override-banner">Admin has taken control of this vehicle.
-      ${myRole === 'admin' ? `<button id="release-${id}">Release to operator</button>` : ''}</div>`;
-  }
-  if(eStop && eStop.active){
-    bannerHtml += `<div class="override-banner" style="background:#e4574c20;border-color:#e4574c60;color:#e4574c;">
-      EMERGENCY STOP ACTIVE — set by ${eStop.by} (${eStop.role})</div>`;
-  }
-  banner.innerHTML = bannerHtml;
-  const releaseBtn = document.getElementById('release-' + id);
-  if(releaseBtn) releaseBtn.onclick = () => db.ref('devices/' + id + '/control/activeSource').set('operator');
-
-  // Operators lose write ability while admin holds override
-  const disableForOperator = (myRole !== 'admin' && activeSource === 'admin');
-  document.querySelectorAll(`#body-${id} .ctrl-grid button, #body-${id} .ctrl-grid input`).forEach(el => {
-    el.disabled = disableForOperator;
-  });
-}
-
-function renderMessages(id, msgs){
-  const log = document.getElementById('msglog-' + id);
-  if(!log) return;
-  log.innerHTML = Object.values(msgs).map(m => `<div><b>${m.from} (${m.role})</b>: ${m.text}</div>`).join('') || '<div>No messages yet.</div>';
-  log.scrollTop = log.scrollHeight;
-}
-
-// Writes go to control/operator or control/admin depending on who's acting;
-// activeSource decides which one the vehicle should actually obey.
-function sendControl(id, fields){
-  const node = myRole === 'admin' ? 'admin' : 'operator';
-  fields.issuedBy = currentUser.email;
-  fields.ts = Date.now();
-  db.ref(`devices/${id}/control/${node}`).update(fields);
-  if(myRole === 'admin') db.ref(`devices/${id}/control/activeSource`).set('admin');
 }
 
 // ---------------- NOTIFICATIONS ----------------
@@ -552,6 +385,7 @@ function seedDemoFleet(){
     updates['devices/' + id + '/status'] = { online, link: Math.random() > 0.5 ? 'wifi' : 'lte', lastSeen: Date.now() };
     updates['devices/' + id + '/telemetry'] = {
       speed: Math.floor(Math.random()*20), battery: Math.floor(50+Math.random()*50),
+      signal4g: Math.floor(40+Math.random()*60), signalWifi: Math.floor(40+Math.random()*60),
       lat: 19.07 + Math.random()*0.05, lng: 72.87 + Math.random()*0.05,
       task: tasks[Math.floor(Math.random()*tasks.length)]
     };
