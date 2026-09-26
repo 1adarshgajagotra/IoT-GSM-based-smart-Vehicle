@@ -314,8 +314,8 @@ function renderFleetMap(devices){
   const svg = document.getElementById('fleetMap');
   if(!svg || typeof renderFloorPlan !== 'function') return;
   const markerDevices = Object.entries(devices)
-    .filter(([id, d]) => d.telemetry && d.telemetry.room)
-    .map(([id, d]) => ({ id, room: d.telemetry.room, online: d.status && d.status.online, shortLabel: id }));
+    .filter(([id, d]) => d.telemetry && typeof d.telemetry.mapX === 'number' && typeof d.telemetry.mapY === 'number')
+    .map(([id, d]) => ({ id, x: d.telemetry.mapX, y: d.telemetry.mapY, online: d.status && d.status.online, shortLabel: id }));
   renderFloorPlan(svg, {
     devices: markerDevices,
     onMarkerClick: (id) => { window.location.href = 'device-detail.html?id=' + encodeURIComponent(id); }
@@ -397,7 +397,6 @@ function createUser(){
 // ---------------- DEMO FLEET SEEDING ----------------
 function seedDemoFleet(){
   const tasks = ['toPickup','toDrop','idle'];
-  const rooms = typeof DELIVERY_ROOM_IDS !== 'undefined' ? DELIVERY_ROOM_IDS : ['1','2','3'];
   const updates = {};
   for(let i = 1; i <= 9; i++){
     const id = 'demo-' + i;
@@ -406,7 +405,7 @@ function seedDemoFleet(){
     updates['devices/' + id + '/telemetry'] = {
       speed: Math.floor(Math.random()*20), battery: Math.floor(50+Math.random()*50),
       signal4g: Math.floor(40+Math.random()*60), signalWifi: Math.floor(40+Math.random()*60),
-      room: rooms[Math.floor(Math.random()*rooms.length)],
+      mapX: Math.floor(40 + Math.random()*1160), mapY: Math.floor(40 + Math.random()*820),
       lat: 19.07 + Math.random()*0.05, lng: 72.87 + Math.random()*0.05,
       task: tasks[Math.floor(Math.random()*tasks.length)]
     };
