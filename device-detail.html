@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Device Control — IoT-4G Smart Vehicle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<style>
+  :root{
+    --bg:#0f1417; --panel:#171e23; --panel2:#1c252b; --line:#2a333a;
+    --text:#e7edf0; --dim:#7c8992; --mdim:#5b6b74;
+    --green:#33d17a; --amber:#e8a33d; --red:#e4574c; --blue:#4d8fe0; --purple:#a682e8;
+  }
+  *{box-sizing:border-box;}
+  body{ margin:0; background:var(--bg); color:var(--text); font-family:'IBM Plex Sans',sans-serif; }
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 26px; border-bottom:1px solid var(--line); background:var(--panel);
+  }
+  .topbar-left{ display:flex; align-items:center; gap:16px; }
+  .back-link{ color:var(--dim); text-decoration:none; font-size:13px; }
+  .back-link:hover{ color:var(--text); }
+  .topbar h1{ font-size:16px; margin:0; font-weight:600; }
+  .who{ display:flex; align-items:center; gap:14px; font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--dim); }
+  .role-badge{ padding:3px 9px; border-radius:5px; font-size:11px; font-weight:600; }
+  .role-badge.admin{ background:#a682e830; color:var(--purple); }
+  .role-badge.operator{ background:#4d8fe030; color:var(--blue); }
+  .who button{ background:transparent; border:1px solid var(--line); color:var(--dim); padding:6px 12px; border-radius:6px; cursor:pointer; font-size:12.5px; }
+
+  .wrap{ max-width:1100px; margin:0 auto; padding:26px; }
+  .panel{ background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:20px; margin-bottom:18px; }
+  .panel h3{ margin:0 0 14px 0; font-size:13px; font-family:'IBM Plex Mono',monospace; color:var(--dim); font-weight:500; letter-spacing:0.3px; }
+
+  .override-banner{
+    background:#a682e820; border:1px solid #a682e860; color:var(--purple); border-radius:8px;
+    padding:9px 13px; font-size:12.5px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center;
+  }
+  .override-banner.stop{ background:#e4574c20; border-color:#e4574c60; color:var(--red); }
+  .override-banner button{ background:transparent; border:1px solid currentColor; color:inherit; border-radius:5px; padding:4px 10px; font-size:11.5px; cursor:pointer; }
+
+  .telemetry-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:18px; }
+  .telemetry-grid .t{ background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:10px 12px; }
+  .telemetry-grid .t .k{ font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--mdim); }
+  .telemetry-grid .t .v{ font-size:15px; font-weight:600; margin-top:3px; }
+
+  .floor-map-wrap svg{ width:100%; height:auto; display:block; }
+  .room{ cursor:pointer; }
+  .room rect{ fill:#232d34; stroke:#3a454e; stroke-width:1; transition:fill 0.15s; }
+  .room:hover rect{ fill:#2e3a42; }
+  .room.pickup rect{ fill:#33d17a30; stroke:var(--green); }
+  .room.dest rect{ fill:#4d8fe030; stroke:var(--blue); }
+  .room text{ fill:#c7d0d5; font-family:'IBM Plex Sans',sans-serif; font-size:11px; pointer-events:none; }
+  .corridor rect{ fill:#141a1e; stroke:none; }
+  .map-legend{ font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--dim); margin-top:10px; display:flex; gap:18px; }
+  .map-legend span{ display:inline-flex; align-items:center; gap:6px; }
+  .legend-dot{ width:9px; height:9px; border-radius:2px; display:inline-block; }
+  .route-fields{ display:flex; gap:12px; margin-top:14px; flex-wrap:wrap; }
+  .route-fields .f{ flex:1; min-width:180px; }
+  .route-fields label{ font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--dim); display:block; margin-bottom:5px; }
+  .route-fields input{ width:100%; background:#0f1417; border:1px solid var(--line); border-radius:6px; color:var(--text); padding:8px 10px; font-size:13px; }
+
+  .meter-row{ display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+  .meter .k{ font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--mdim); margin-bottom:6px; }
+  .meter-bar{ background:#0f1417; border:1px solid var(--line); border-radius:5px; height:10px; overflow:hidden; }
+  .meter-fill{ height:100%; background:var(--green); transition:width 0.3s; }
+  .meter-fill.mid{ background:var(--amber); } .meter-fill.low{ background:var(--red); }
+  .meter-val{ font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--dim); margin-top:4px; }
+
+  .btn{ background:var(--blue); border:none; color:#0b1116; font-weight:600; padding:9px 16px; border-radius:6px; cursor:pointer; font-size:13px; }
+  .btn.red{ background:var(--red); } .btn.grey{ background:var(--line); color:var(--text); }
+  .btn.outline{ background:transparent; border:1px solid var(--line); color:var(--text); }
+  .btn.full{ width:100%; }
+  .btn:disabled{ opacity:0.45; cursor:default; }
+  .row-gap{ display:flex; gap:10px; flex-wrap:wrap; }
+
+  .video-placeholder{
+    background:#0a0d0f; border:1px dashed var(--line); border-radius:8px; padding:34px;
+    text-align:center; color:var(--mdim); font-family:'IBM Plex Mono',monospace; font-size:12px; margin-top:12px; display:none;
+  }
+  .video-placeholder.open{ display:block; }
+
+  .dpad{ display:grid; grid-template-columns:repeat(3,46px); grid-template-rows:repeat(2,42px); gap:6px; margin-top:12px; display:none; }
+  .dpad.open{ display:grid; }
+  .dpad button{ font-size:13px; }
+
+  .msg-log{ background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:10px 12px;
+    height:120px; overflow-y:auto; font-family:'IBM Plex Mono',monospace; font-size:12px; margin-bottom:8px; }
+  .msg-log div{ margin-bottom:5px; color:var(--dim); }
+  .msg-log div b{ color:var(--text); }
+  .msg-send{ display:flex; gap:8px; }
+  .msg-send input{ flex:1; background:#0f1417; border:1px solid var(--line); border-radius:6px; color:var(--text); padding:8px 10px; }
+
+  @media(max-width:700px){ .telemetry-grid{ grid-template-columns:repeat(2,1fr); } .meter-row{ grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <a class="back-link" href="dashboard.html">‹ Devices</a>
+    <h1 id="deviceTitle">Device</h1>
+  </div>
+  <div class="who">
+    <span id="whoEmail">—</span>
+    <span class="role-badge" id="roleBadge">—</span>
+    <button id="signOutBtn">Sign out</button>
+  </div>
+</div>
+
+<div class="wrap">
+  <div id="banner"></div>
+
+  <div class="panel">
+    <h3>TELEMETRY</h3>
+    <div class="telemetry-grid" id="telem"></div>
+  </div>
+
+  <div class="panel">
+    <h3>HOSPITAL FLOOR MAP — click a room to set Pickup, click again elsewhere for Destination</h3>
+    <div class="floor-map-wrap">
+      <svg viewBox="0 0 620 260" id="floorSvg">
+        <g class="corridor"><rect x="10" y="90" width="600" height="30"></rect></g>
+
+        <g class="room" data-room="Reception"><rect x="10" y="10" width="110" height="65" rx="4"></rect><text x="65" y="47" text-anchor="middle">Reception</text></g>
+        <g class="room" data-room="ICU"><rect x="135" y="10" width="110" height="65" rx="4"></rect><text x="190" y="47" text-anchor="middle">ICU</text></g>
+        <g class="room" data-room="Ward A"><rect x="260" y="10" width="110" height="65" rx="4"></rect><text x="315" y="47" text-anchor="middle">Ward A</text></g>
+        <g class="room" data-room="Ward B"><rect x="385" y="10" width="110" height="65" rx="4"></rect><text x="440" y="47" text-anchor="middle">Ward B</text></g>
+        <g class="room" data-room="Elevator"><rect x="510" y="10" width="100" height="65" rx="4"></rect><text x="560" y="47" text-anchor="middle">Elevator</text></g>
+
+        <g class="room" data-room="Nurse Station"><rect x="10" y="135" width="110" height="65" rx="4"></rect><text x="65" y="172" text-anchor="middle">Nurse Station</text></g>
+        <g class="room" data-room="Pharmacy"><rect x="135" y="135" width="110" height="65" rx="4"></rect><text x="190" y="172" text-anchor="middle">Pharmacy</text></g>
+        <g class="room" data-room="Store Room"><rect x="260" y="135" width="110" height="65" rx="4"></rect><text x="315" y="172" text-anchor="middle">Store Room</text></g>
+        <g class="room" data-room="Lab"><rect x="385" y="135" width="110" height="65" rx="4"></rect><text x="440" y="172" text-anchor="middle">Lab</text></g>
+        <g class="room" data-room="Discharge Bay"><rect x="510" y="135" width="100" height="65" rx="4"></rect><text x="560" y="168" text-anchor="middle">Discharge</text><text x="560" y="180" text-anchor="middle">Bay</text></g>
+      </svg>
+      <div class="map-legend">
+        <span><span class="legend-dot" style="background:#33d17a;"></span>Pickup</span>
+        <span><span class="legend-dot" style="background:#4d8fe0;"></span>Destination</span>
+        <span style="opacity:0.7;">(demo floor plan — not tied to live GPS positioning yet)</span>
+      </div>
+    </div>
+    <div class="route-fields">
+      <div class="f"><label>PICKUP POINT</label><input id="pickup"></div>
+      <div class="f"><label>DESTINATION POINT</label><input id="dest"></div>
+    </div>
+    <div class="row-gap" style="margin-top:12px;">
+      <button class="btn" id="sendRoute">Send route</button>
+      <button class="btn outline" id="clearRoute">Clear selection</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h3>LIVE VIDEO FEED</h3>
+    <button class="btn outline" id="videoToggle">Open Live Video Feed</button>
+    <div class="video-placeholder" id="videoPlaceholder">
+      Live feed not connected yet.<br>
+      This needs a camera stream from the vehicle (e.g. ESP32-CAM or a USB webcam via the EC200U's data link) —
+      wire its stream URL here once that hardware piece is built.
+    </div>
+  </div>
+
+  <div class="panel">
+    <h3>SIGNAL &amp; POWER</h3>
+    <div class="meter-row">
+      <div class="meter">
+        <div class="k">4G SIGNAL STRENGTH</div>
+        <div class="meter-bar"><div class="meter-fill" id="meter4g"></div></div>
+        <div class="meter-val" id="meter4gVal">—</div>
+      </div>
+      <div class="meter">
+        <div class="k">WIFI SIGNAL STRENGTH</div>
+        <div class="meter-bar"><div class="meter-fill" id="meterWifi"></div></div>
+        <div class="meter-val" id="meterWifiVal">—</div>
+      </div>
+      <div class="meter">
+        <div class="k">BATTERY STATUS</div>
+        <div class="meter-bar"><div class="meter-fill" id="meterBattery"></div></div>
+        <div class="meter-val" id="meterBatteryVal">—</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h3>EMERGENCY &amp; MANUAL CONTROL</h3>
+    <div class="row-gap">
+      <button class="btn red" id="estop">EMERGENCY STOP</button>
+      <button class="btn grey" id="estopClear">Clear stop</button>
+    </div>
+    <div class="row-gap" style="margin-top:14px;">
+      <button class="btn outline" id="manualToggle">Take Manual Control</button>
+      <span id="overrideWrap"></span>
+    </div>
+    <div class="dpad" id="dpad">
+      <span></span><button data-dir="F">▲</button><span></span>
+      <button data-dir="L">◀</button><button class="red" data-dir="STOP">■</button><button data-dir="R">▶</button>
+      <span></span><button data-dir="B">▼</button><span></span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h3>TWO-WAY MESSAGES</h3>
+    <div class="msg-log" id="msglog"></div>
+    <div class="msg-send"><input id="msgInput" placeholder="Message to vehicle…"><button class="btn" id="msgSend">Send</button></div>
+  </div>
+</div>
+
+<script>
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCeGwiHATO-1Dg4zY3nrbTzb0GG2h7Sm_A",
+  authDomain: "iot-4g-based-smart-vehicle.firebaseapp.com",
+  databaseURL: "https://iot-4g-based-smart-vehicle-default-rtdb.firebaseio.com",
+  projectId: "iot-4g-based-smart-vehicle",
+  appId: "1:6008451577:web:e9da521ece03e7b0c68d28"
+};
+
+firebase.initializeApp(FIREBASE_CONFIG);
+const auth = firebase.auth();
+const db = firebase.database();
+
+const params = new URLSearchParams(window.location.search);
+const deviceId = params.get('id');
+if(!deviceId){ window.location.href = 'dashboard.html'; }
+
+let currentUser = null;
+let myRole = null;
+let manualEnabled = false;
+let mapSelection = { pickup:null, dest:null };
+
+auth.onAuthStateChanged(user => {
+  if(!user){ window.location.href = 'index.html'; return; }
+  currentUser = user;
+  db.ref('users/' + user.uid).get().then(snap => {
+    const rec = snap.val();
+    if(!rec || rec.disabled){ auth.signOut(); window.location.href = 'index.html'; return; }
+    myRole = rec.role;
+    document.getElementById('whoEmail').textContent = rec.email || user.email;
+    const badge = document.getElementById('roleBadge');
+    badge.textContent = myRole.toUpperCase();
+    badge.className = 'role-badge ' + myRole;
+    document.getElementById('deviceTitle').textContent = deviceId;
+    initPanel();
+  });
+});
+document.getElementById('signOutBtn').onclick = () => auth.signOut();
+
+function initPanel(){
+  // Floor map room clicks: first click sets pickup, second sets destination,
+  // clicking the same room again clears it.
+  document.querySelectorAll('#floorSvg .room').forEach(g => {
+    g.onclick = () => {
+      const name = g.dataset.room;
+      if(mapSelection.pickup === name){ mapSelection.pickup = null; }
+      else if(mapSelection.dest === name){ mapSelection.dest = null; }
+      else if(!mapSelection.pickup){ mapSelection.pickup = name; }
+      else if(!mapSelection.dest && name !== mapSelection.pickup){ mapSelection.dest = name; }
+      else { mapSelection.dest = name; }
+      renderMapSelection();
+    };
+  });
+  document.getElementById('clearRoute').onclick = () => {
+    mapSelection = { pickup:null, dest:null };
+    renderMapSelection();
+  };
+  document.getElementById('sendRoute').onclick = () => sendControl({
+    pickup: document.getElementById('pickup').value,
+    destination: document.getElementById('dest').value
+  });
+
+  document.getElementById('videoToggle').onclick = (e) => {
+    const box = document.getElementById('videoPlaceholder');
+    box.classList.toggle('open');
+    e.target.textContent = box.classList.contains('open') ? 'Close Live Video Feed' : 'Open Live Video Feed';
+  };
+
+  document.getElementById('estop').onclick = () =>
+    db.ref('devices/' + deviceId + '/control/emergencyStopGlobal').set({ active:true, by: currentUser.email, role: myRole, ts: Date.now() });
+  document.getElementById('estopClear').onclick = () =>
+    db.ref('devices/' + deviceId + '/control/emergencyStopGlobal').set({ active:false, by: currentUser.email, role: myRole, ts: Date.now() });
+
+  document.getElementById('manualToggle').onclick = (e) => {
+    manualEnabled = !manualEnabled;
+    document.getElementById('dpad').classList.toggle('open', manualEnabled);
+    e.target.textContent = manualEnabled ? 'Re-engage Autonomous Mode' : 'Take Manual Control';
+    sendControl({ mode: manualEnabled ? 'manual' : 'auto' });
+  };
+  document.querySelectorAll('#dpad button').forEach(b => {
+    b.onclick = () => sendControl({ manualDir: b.dataset.dir, manualTs: Date.now() });
+  });
+
+  if(myRole === 'admin'){
+    document.getElementById('overrideWrap').innerHTML = `<button class="btn" id="overrideBtn">Take control (override)</button>`;
+    document.getElementById('overrideBtn').onclick = () => db.ref('devices/' + deviceId + '/control/activeSource').set('admin');
+  }
+
+  document.getElementById('msgSend').onclick = () => {
+    const input = document.getElementById('msgInput');
+    if(!input.value.trim()) return;
+    db.ref('devices/' + deviceId + '/messages').push({ from: currentUser.email, role: myRole, text: input.value.trim(), ts: Date.now() });
+    input.value = '';
+  };
+
+  db.ref('devices/' + deviceId).on('value', snap => renderDeviceState(snap.val() || {}));
+  db.ref('devices/' + deviceId + '/messages').limitToLast(20).on('value', snap => renderMessages(snap.val() || {}));
+}
+
+function renderMapSelection(){
+  document.querySelectorAll('#floorSvg .room').forEach(g => {
+    g.classList.remove('pickup','dest');
+    if(g.dataset.room === mapSelection.pickup) g.classList.add('pickup');
+    if(g.dataset.room === mapSelection.dest) g.classList.add('dest');
+  });
+  document.getElementById('pickup').value = mapSelection.pickup || '';
+  document.getElementById('dest').value = mapSelection.dest || '';
+}
+
+function meterClass(val){
+  if(val >= 50) return ''; if(val >= 20) return 'mid'; return 'low';
+}
+
+function renderDeviceState(d){
+  const telem = d.telemetry || {};
+  document.getElementById('telem').innerHTML = `
+    <div class="t"><div class="k">SPEED</div><div class="v">${telem.speed ?? '—'} km/h</div></div>
+    <div class="t"><div class="k">BATTERY</div><div class="v">${telem.battery ?? '—'}%</div></div>
+    <div class="t"><div class="k">GPS</div><div class="v" style="font-size:12px;">${telem.lat ? telem.lat.toFixed(4)+', '+telem.lng.toFixed(4) : '—'}</div></div>
+    <div class="t"><div class="k">TASK</div><div class="v" style="font-size:12px;">${telem.task || 'idle'}</div></div>
+  `;
+
+  const set = (fillId, valId, val) => {
+    const fill = document.getElementById(fillId), valEl = document.getElementById(valId);
+    const pct = typeof val === 'number' ? val : 0;
+    fill.style.width = pct + '%';
+    fill.className = 'meter-fill ' + meterClass(pct);
+    valEl.textContent = typeof val === 'number' ? val + '%' : 'No data yet';
+  };
+  set('meter4g', 'meter4gVal', telem.signal4g);
+  set('meterWifi', 'meterWifiVal', telem.signalWifi);
+  set('meterBattery', 'meterBatteryVal', telem.battery);
+
+  const activeSource = (d.control && d.control.activeSource) || 'operator';
+  const eStop = d.control && d.control.emergencyStopGlobal;
+  let bannerHtml = '';
+  if(activeSource === 'admin'){
+    bannerHtml += `<div class="override-banner">Admin has taken control of this vehicle.
+      ${myRole === 'admin' ? `<button id="release">Release to operator</button>` : ''}</div>`;
+  }
+  if(eStop && eStop.active){
+    bannerHtml += `<div class="override-banner stop">EMERGENCY STOP ACTIVE — set by ${eStop.by} (${eStop.role})</div>`;
+  }
+  document.getElementById('banner').innerHTML = bannerHtml;
+  const releaseBtn = document.getElementById('release');
+  if(releaseBtn) releaseBtn.onclick = () => db.ref('devices/' + deviceId + '/control/activeSource').set('operator');
+
+  const disableForOperator = (myRole !== 'admin' && activeSource === 'admin');
+  document.querySelectorAll('.panel button, .panel input').forEach(el => {
+    if(el.id !== 'signOutBtn') el.disabled = disableForOperator;
+  });
+}
+
+function renderMessages(msgs){
+  const log = document.getElementById('msglog');
+  log.innerHTML = Object.values(msgs).map(m => `<div><b>${m.from} (${m.role})</b>: ${m.text}</div>`).join('') || '<div>No messages yet.</div>';
+  log.scrollTop = log.scrollHeight;
+}
+
+function sendControl(fields){
+  const node = myRole === 'admin' ? 'admin' : 'operator';
+  fields.issuedBy = currentUser.email;
+  fields.ts = Date.now();
+  db.ref(`devices/${deviceId}/control/${node}`).update(fields);
+  if(myRole === 'admin') db.ref(`devices/${deviceId}/control/activeSource`).set('admin');
+}
+</script>
+</body>
+</html>
