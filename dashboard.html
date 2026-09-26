@@ -10,6 +10,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<script src="floor-plan.js"></script>
 <style>
   :root{
     --bg:#0f1417; --panel:#171e23; --panel2:#1c252b; --line:#2a333a;
@@ -105,6 +106,10 @@
 
 <!-- DASHBOARD -->
 <div class="view active" id="view-dashboard">
+  <div class="panel" style="margin-bottom:18px;">
+    <h3>LIVE FLEET MAP — click a vehicle marker to open its control panel</h3>
+    <svg id="fleetMap" style="width:100%; height:auto; display:block;"></svg>
+  </div>
   <div class="grid3">
     <div class="panel">
       <h3>DEVICE STATUS</h3>
@@ -301,6 +306,20 @@ function renderCharts(devices){
   if(linkChart){ linkChart.data.datasets[0].data = [wifi, lte]; linkChart.update(); }
   if(batteryChart){ batteryChart.data.datasets[0].data = batteryBuckets; batteryChart.update(); }
   if(controlChart){ controlChart.data.datasets[0].data = [operatorControlled, adminControlled]; controlChart.update(); }
+
+  renderFleetMap(devices);
+}
+
+function renderFleetMap(devices){
+  const svg = document.getElementById('fleetMap');
+  if(!svg || typeof renderFloorPlan !== 'function') return;
+  const markerDevices = Object.entries(devices)
+    .filter(([id, d]) => d.telemetry && d.telemetry.room)
+    .map(([id, d]) => ({ id, room: d.telemetry.room, online: d.status && d.status.online, shortLabel: id }));
+  renderFloorPlan(svg, {
+    devices: markerDevices,
+    onMarkerClick: (id) => { window.location.href = 'device-detail.html?id=' + encodeURIComponent(id); }
+  });
 }
 
 function renderDeviceList(devices){
@@ -378,6 +397,7 @@ function createUser(){
 // ---------------- DEMO FLEET SEEDING ----------------
 function seedDemoFleet(){
   const tasks = ['toPickup','toDrop','idle'];
+  const rooms = typeof DELIVERY_ROOM_IDS !== 'undefined' ? DELIVERY_ROOM_IDS : ['1','2','3'];
   const updates = {};
   for(let i = 1; i <= 9; i++){
     const id = 'demo-' + i;
@@ -386,6 +406,7 @@ function seedDemoFleet(){
     updates['devices/' + id + '/telemetry'] = {
       speed: Math.floor(Math.random()*20), battery: Math.floor(50+Math.random()*50),
       signal4g: Math.floor(40+Math.random()*60), signalWifi: Math.floor(40+Math.random()*60),
+      room: rooms[Math.floor(Math.random()*rooms.length)],
       lat: 19.07 + Math.random()*0.05, lng: 72.87 + Math.random()*0.05,
       task: tasks[Math.floor(Math.random()*tasks.length)]
     };
