@@ -100,7 +100,9 @@
 <div class="tabs">
   <div class="tab active" data-view="dashboard">Dashboard</div>
   <div class="tab" data-view="devices">Devices Status</div>
+  <div class="tab" data-view="requests">Requests</div>
   <div class="tab" data-view="notifications">Notifications</div>
+  <div class="tab" data-view="staffaccounts">Staff Accounts</div>
   <div class="tab admin-tab" data-view="admin" id="adminTabBtn" style="display:none;">Admin</div>
 </div>
 
@@ -142,11 +144,41 @@
   </div>
 </div>
 
+<!-- REQUESTS -->
+<div class="view" id="view-requests">
+  <div class="panel">
+    <h3>MATERIAL REQUESTS FROM HOSPITAL STAFF</h3>
+    <table>
+      <thead><tr><th>Item</th><th>From</th><th>To</th><th>Requested by</th><th>Status</th><th>Assign</th></tr></thead>
+      <tbody id="requestsTableBody"></tbody>
+    </table>
+  </div>
+</div>
+
 <!-- NOTIFICATIONS -->
 <div class="view" id="view-notifications">
   <div class="panel">
     <h3>NOTIFICATIONS</h3>
     <div id="notifList"></div>
+  </div>
+</div>
+
+<!-- STAFF ACCOUNTS (operator + admin) -->
+<div class="view" id="view-staffaccounts">
+  <div class="panel">
+    <h3>CREATE HOSPITAL STAFF ACCOUNT</h3>
+    <div class="create-user-form" style="grid-template-columns:1fr 1fr 100px;">
+      <div><label>EMAIL</label><input id="newStaffEmail" placeholder="nurse.wardA@iot4g.local"></div>
+      <div><label>PASSWORD</label><input id="newStaffPassword" type="text" placeholder="min 6 chars"></div>
+      <div><button class="btn" id="createStaffBtn" style="width:100%;">Create</button></div>
+    </div>
+    <div id="createStaffMsg" style="font-family:'IBM Plex Mono',monospace;font-size:12px;margin-bottom:20px;"></div>
+
+    <h3>HOSPITAL STAFF USERS</h3>
+    <table>
+      <thead><tr><th>Email</th><th>Status</th><th></th></tr></thead>
+      <tbody id="staffTableBody"></tbody>
+    </table>
   </div>
 </div>
 
@@ -158,7 +190,7 @@
       <div><label>EMAIL</label><input id="newEmail" placeholder="operator2@iot4g.local"></div>
       <div><label>PASSWORD</label><input id="newPassword" type="text" placeholder="min 6 chars"></div>
       <div><label>ROLE</label>
-        <select id="newRole"><option value="operator">Operator</option><option value="admin">Admin</option></select>
+        <select id="newRole"><option value="operator">Operator</option><option value="admin">Admin</option><option value="staff">Hospital Staff</option></select>
       </div>
       <div><button class="btn" id="createUserBtn" style="width:100%;">Create</button></div>
     </div>
@@ -200,6 +232,7 @@ auth.onAuthStateChanged(user => {
   db.ref('users/' + user.uid).get().then(snap => {
     const rec = snap.val();
     if(!rec || rec.disabled){ auth.signOut(); window.location.href = 'index.html'; return; }
+    if(rec.role === 'staff'){ window.location.href = 'staff-app.html'; return; } // command center is for operator/admin only
     myRole = rec.role;
     document.getElementById('whoEmail').textContent = rec.email || user.email;
     const badge = document.getElementById('roleBadge');
@@ -249,6 +282,7 @@ function initCharts(){
 }
 
 // ---------------- INIT ----------------
+let latestDevicesCache = {};
 function initApp(){
   // Each piece is isolated: if one fails (e.g. the Chart.js CDN is
   // blocked), the rest of the app — buttons, listeners, other tabs —
@@ -256,6 +290,8 @@ function initApp(){
   try{ initCharts(); } catch(e){ console.error('Chart init failed:', e); }
   try{ listenDevices(); } catch(e){ console.error('Device listener failed:', e); }
   try{ listenNotifications(); } catch(e){ console.error('Notifications listener failed:', e); }
+  try{ listenRequests(); } catch(e){ console.error('Requests listener failed:', e); }
+  try{ listenStaffUsers(); } catch(e){ console.error('Staff users listener failed:', e); }
   if(myRole === 'admin'){
     try{ listenUsers(); } catch(e){ console.error('User listener failed:', e); }
     const seedBtn = document.getElementById('seedBtn');
@@ -263,12 +299,21 @@ function initApp(){
   }
   const createBtn = document.getElementById('createUserBtn');
   if(createBtn) createBtn.onclick = createUser;
+  const createStaffBtn = document.getElementById('createStaffBtn');
+  if(createStaffBtn) createStaffBtn.onclick = createStaffUser;
+
+  // Desktop notification when a new request comes in, for as long as this
+  // tab stays open — no backend/push-service needed for this to work.
+  if(window.Notification && Notification.permission === 'default'){
+    Notification.requestPermission();
+  }
 }
 
 // ---------------- DEVICES ----------------
 function listenDevices(){
   db.ref('devices').on('value', snap => {
     const devices = snap.val() || {};
+    latestDevicesCache = devices;
     renderCharts(devices);
     renderDeviceList(devices);
   });
@@ -358,6 +403,116 @@ function listenNotifications(){
         <span class="notif-time">${new Date(n.ts).toLocaleString()}</span>
       </div>`).join('') : '<div style="color:#7c8992;padding:10px;">No notifications yet.</div>';
   });
+}
+
+// ---------------- REQUESTS (from hospital staff) ----------------
+let requestsFirstLoadTimer = true;
+function roomLabelFor(id){
+  const r = (typeof roomById === 'function') ? roomById(id) : null;
+  return r ? r.label : (id || '—');
+}
+
+function listenRequests(){
+  const ref = db.ref('requests').limitToLast(100);
+  ref.on('value', snap => renderRequestsTable(snap.val() || {}));
+  ref.on('child_added', snap => {
+    if(requestsFirstLoadTimer) return; // skip the initial burst of existing requests on page load
+    const r = snap.val();
+    if(r && r.status === 'pending') notifyNewRequest(r);
+  });
+  setTimeout(() => { requestsFirstLoadTimer = false; }, 1500);
+}
+
+function notifyNewRequest(r){
+  const text = `New request: ${r.item} — ${roomLabelFor(r.fromRoom)} → ${roomLabelFor(r.toRoom)} (by ${r.requestedBy})`;
+  if(window.Notification && Notification.permission === 'granted'){
+    new Notification('New material request', { body: text });
+  }
+  db.ref('notifications').push({ message: text, severity:'info', ts: Date.now() });
+}
+
+function renderRequestsTable(reqs){
+  const body = document.getElementById('requestsTableBody');
+  if(!body) return;
+  const entries = Object.entries(reqs).sort((a,b) => (b[1].ts||0) - (a[1].ts||0));
+  const onlineOptions = Object.entries(latestDevicesCache)
+    .filter(([id,d]) => d.status && d.status.online)
+    .map(([id]) => `<option value="${id}">${id}</option>`).join('') || '<option value="">No online devices</option>';
+
+  body.innerHTML = entries.length ? entries.map(([id, r]) => {
+    const assignCell = r.status === 'pending'
+      ? `<select id="assignDevice-${id}">${onlineOptions}</select> <button class="btn" data-assign="${id}">Assign</button>`
+      : `<span class="tag admin">${r.assignedDeviceId || '—'}</span>`;
+    return `<tr>
+      <td>${r.item}</td><td>${roomLabelFor(r.fromRoom)}</td><td>${roomLabelFor(r.toRoom)}</td>
+      <td>${r.requestedBy}</td>
+      <td><span class="tag ${r.status === 'pending' ? 'operator' : 'admin'}">${r.status}</span></td>
+      <td>${assignCell}</td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="6" style="color:#7c8992;">No requests yet.</td></tr>';
+
+  body.querySelectorAll('button[data-assign]').forEach(btn => {
+    btn.onclick = () => {
+      const reqId = btn.dataset.assign;
+      const deviceId = document.getElementById('assignDevice-' + reqId).value;
+      if(!deviceId) return;
+      assignRequest(reqId, deviceId);
+    };
+  });
+}
+
+function assignRequest(reqId, deviceId){
+  db.ref('requests/' + reqId).once('value').then(snap => {
+    const r = snap.val();
+    if(!r) return;
+    const node = myRole === 'admin' ? 'admin' : 'operator';
+    const updates = {};
+    updates['requests/' + reqId + '/status'] = 'assigned';
+    updates['requests/' + reqId + '/assignedDeviceId'] = deviceId;
+    updates['requests/' + reqId + '/assignedBy'] = currentUser.email;
+    updates['requests/' + reqId + '/assignedAt'] = Date.now();
+    // Also pushes the route straight to the vehicle, so assigning a request
+    // and sending the route to the vehicle is one action, not two.
+    updates[`devices/${deviceId}/control/${node}/pickup`] = r.fromRoom;
+    updates[`devices/${deviceId}/control/${node}/destination`] = r.toRoom;
+    updates[`devices/${deviceId}/control/${node}/issuedBy`] = currentUser.email;
+    updates[`devices/${deviceId}/control/${node}/ts`] = Date.now();
+    if(myRole === 'admin') updates[`devices/${deviceId}/control/activeSource`] = 'admin';
+    db.ref().update(updates);
+  });
+}
+
+// ---------------- STAFF ACCOUNTS (operator + admin can both do this) ----------------
+function listenStaffUsers(){
+  db.ref('users').on('value', snap => {
+    const users = snap.val() || {};
+    const body = document.getElementById('staffTableBody');
+    if(!body) return;
+    const staffEntries = Object.entries(users).filter(([uid, u]) => u.role === 'staff');
+    body.innerHTML = staffEntries.length ? staffEntries.map(([uid, u]) => `
+      <tr>
+        <td>${u.email}</td>
+        <td>${u.disabled ? '<span class="tag disabled">disabled</span>' : 'active'}</td>
+        <td><button class="btn ${u.disabled ? '' : 'red'}" data-uid="${uid}" data-disabled="${!!u.disabled}">${u.disabled ? 'Enable' : 'Disable'}</button></td>
+      </tr>`).join('') : '<tr><td colspan="3" style="color:#7c8992;">No staff accounts yet.</td></tr>';
+    body.querySelectorAll('button[data-uid]').forEach(btn => {
+      btn.onclick = () => db.ref('users/' + btn.dataset.uid + '/disabled').set(btn.dataset.disabled === 'false');
+    });
+  });
+}
+
+function createStaffUser(){
+  const email = document.getElementById('newStaffEmail').value.trim();
+  const password = document.getElementById('newStaffPassword').value;
+  const msgEl = document.getElementById('createStaffMsg');
+  if(!email || password.length < 6){ msgEl.textContent = 'Enter an email and a password of at least 6 characters.'; return; }
+
+  const secondary = firebase.apps.find(a => a.name === 'Secondary') || firebase.initializeApp(FIREBASE_CONFIG, 'Secondary');
+  secondary.auth().createUserWithEmailAndPassword(email, password)
+    .then(cred => db.ref('users/' + cred.user.uid).set({ email, role:'staff', disabled:false, createdBy: currentUser.email, createdAt: Date.now() })
+      .then(() => secondary.auth().signOut()))
+    .then(() => { msgEl.textContent = 'Staff account created.'; document.getElementById('newStaffEmail').value=''; document.getElementById('newStaffPassword').value=''; })
+    .catch(err => { msgEl.textContent = err.message; });
 }
 
 // ---------------- ADMIN: USERS ----------------
