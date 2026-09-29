@@ -327,7 +327,7 @@ function renderCharts(devices){
   let operatorControlled = 0, adminControlled = 0;
 
   Object.values(devices).forEach(d => {
-    if(d.status && d.status.online) online++; else offline++;
+    if(isDeviceOnline(d.status)) online++; else offline++;
     const task = (d.telemetry && d.telemetry.task) || 'idle';
     if(task === 'toPickup') pick++; else if(task === 'toDrop') drop++; else idle++;
 
@@ -360,7 +360,7 @@ function renderFleetMap(devices){
   if(!svg || typeof renderFloorPlan !== 'function') return;
   const markerDevices = Object.entries(devices)
     .filter(([id, d]) => d.telemetry && typeof d.telemetry.mapX === 'number' && typeof d.telemetry.mapY === 'number')
-    .map(([id, d]) => ({ id, x: d.telemetry.mapX, y: d.telemetry.mapY, online: d.status && d.status.online, shortLabel: id }));
+    .map(([id, d]) => ({ id, x: d.telemetry.mapX, y: d.telemetry.mapY, online: isDeviceOnline(d.status), shortLabel: id }));
   renderFloorPlan(svg, {
     devices: markerDevices,
     onMarkerClick: (id) => { window.location.href = 'device-detail.html?id=' + encodeURIComponent(id); }
@@ -374,7 +374,7 @@ function renderDeviceList(devices){
   list.innerHTML = '';
   ids.forEach(id => {
     const d = devices[id];
-    const online = d.status && d.status.online;
+    const online = isDeviceOnline(d.status);
     const link = (d.status && d.status.link) || '—';
     const row = document.createElement('a');
     row.className = 'device-row';
@@ -436,7 +436,7 @@ function renderRequestsTable(reqs){
   if(!body) return;
   const entries = Object.entries(reqs).sort((a,b) => (b[1].ts||0) - (a[1].ts||0));
   const onlineOptions = Object.entries(latestDevicesCache)
-    .filter(([id,d]) => d.status && d.status.online)
+    .filter(([id,d]) => isDeviceOnline(d.status))
     .map(([id]) => `<option value="${id}">${id}</option>`).join('') || '<option value="">No online devices</option>';
 
   body.innerHTML = entries.length ? entries.map(([id, r]) => {
