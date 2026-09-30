@@ -382,14 +382,17 @@ function renderDeviceList(devices){
     row.innerHTML = `
       <div class="device-head-left">
         <span class="dot ${online ? 'on' : 'off'}"></span>
-        <span class="dname">${id}${id !== REAL_DEVICE_ID ? '<span class="sim-badge">simulated</span>' : ''}</span>
-        <span class="dmeta">${online ? 'ONLINE' : 'OFFLINE'} · ${link.toUpperCase()}</span>
+        <span class="dname">${escHtml(id)}${id !== REAL_DEVICE_ID ? '<span class="sim-badge">simulated</span>' : ''}</span>
+        <span class="dmeta">${online ? 'ONLINE' : 'OFFLINE'} · ${escHtml(link.toUpperCase())}</span>
       </div>
       <span class="chevron">›</span>
     `;
     list.appendChild(row);
   });
 }
+
+// XSS fix: escape user-controlled strings before inserting into innerHTML
+function escHtml(str){ return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 // ---------------- NOTIFICATIONS ----------------
 function listenNotifications(){
@@ -398,8 +401,8 @@ function listenNotifications(){
     const list = document.getElementById('notifList');
     list.innerHTML = items.length ? items.map(n => `
       <div class="notif-row">
-        <span class="sev ${n.severity || 'info'}"></span>
-        <span class="notif-text">${n.message}</span>
+        <span class="sev ${escHtml(n.severity || 'info')}"></span>
+        <span class="notif-text">${escHtml(n.message)}</span>
         <span class="notif-time">${new Date(n.ts).toLocaleString()}</span>
       </div>`).join('') : '<div style="color:#7c8992;padding:10px;">No notifications yet.</div>';
   });
@@ -444,9 +447,9 @@ function renderRequestsTable(reqs){
       ? `<select id="assignDevice-${id}">${onlineOptions}</select> <button class="btn" data-assign="${id}">Assign</button>`
       : `<span class="tag admin">${r.assignedDeviceId || '—'}</span>`;
     return `<tr>
-      <td>${r.item}</td><td>${roomLabelFor(r.fromRoom)}</td><td>${roomLabelFor(r.toRoom)}</td>
-      <td>${r.requestedBy}</td>
-      <td><span class="tag ${r.status === 'pending' ? 'operator' : 'admin'}">${r.status}</span></td>
+      <td>${escHtml(r.item)}</td><td>${escHtml(roomLabelFor(r.fromRoom))}</td><td>${escHtml(roomLabelFor(r.toRoom))}</td>
+      <td>${escHtml(r.requestedBy)}</td>
+      <td><span class="tag ${r.status === 'pending' ? 'operator' : 'admin'}">${escHtml(r.status)}</span></td>
       <td>${assignCell}</td>
     </tr>`;
   }).join('') : '<tr><td colspan="6" style="color:#7c8992;">No requests yet.</td></tr>';

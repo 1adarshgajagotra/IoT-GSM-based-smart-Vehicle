@@ -147,16 +147,19 @@ function submitRequest(){
   }).finally(() => { btn.disabled = false; });
 }
 
+// XSS fix: escape user-controlled strings before inserting into innerHTML
+function escHtml(str){ return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
 function listenMyRequests(){
   db.ref('requests').orderByChild('requestedByUid').equalTo(currentUser.uid).on('value', snap => {
     const items = Object.values(snap.val() || {}).sort((a,b) => b.ts - a.ts);
     const wrap = document.getElementById('myRequests');
     wrap.innerHTML = items.length ? items.map(r => `
       <div class="req-card">
-        <div class="item">${r.item}</div>
-        <div class="route">${roomById(r.fromRoom) ? roomById(r.fromRoom).label : r.fromRoom} → ${roomById(r.toRoom) ? roomById(r.toRoom).label : r.toRoom}</div>
+        <div class="item">${escHtml(r.item)}</div>
+        <div class="route">${escHtml(roomById(r.fromRoom) ? roomById(r.fromRoom).label : r.fromRoom)} → ${escHtml(roomById(r.toRoom) ? roomById(r.toRoom).label : r.toRoom)}</div>
         <div class="meta">
-          <span class="status-pill ${r.status}">${r.status}</span>
+          <span class="status-pill ${escHtml(r.status)}">${escHtml(r.status)}</span>
           <span class="req-time">${new Date(r.ts).toLocaleString()}</span>
         </div>
       </div>`).join('') : '<div style="color:var(--mdim);font-size:13px;">No requests yet.</div>';
